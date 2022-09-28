@@ -1,2 +1,12 @@
 (library
- (name pruning))
+ (name pruning)
+ (modules Syntax MetaContext Normalize Unify Typecheck Pretty Parser Lexer))
+
+(ocamlyacc Parser)
+(ocamllex Lexer)
+
+
+(test
+ (name PruningTest)
+ (libraries pruning)
+ (modules PruningTest))

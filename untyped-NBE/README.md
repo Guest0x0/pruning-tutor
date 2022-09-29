@@ -258,5 +258,5 @@ So we should apply only `x` and `z` to `?M`.
 <a id="ref2" href="https://www.cse.chalmers.se/~abela/habil.pdf">[2]</a>
 Normalization by Evaluation, Dependent Types and Impredicativity
 
-<a id="ref3" ref="https://ieeexplore.ieee.org/document/287599">[3]</a>
+<a id="ref3" href="https://ieeexplore.ieee.org/document/287599">[3]</a>
 Functional unification of higher-order patterns

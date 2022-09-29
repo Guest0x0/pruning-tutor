@@ -224,7 +224,30 @@ hence this recursive computation won't loop forever.
 
 For the detailed index/level arithmetic,
 and how to compute the weakening substitution, etc.,
-refer to `Unify.ml`
+refer to `Unify.ml`.
+
+
+## Integration with elaboration
+
+I have explained the pattern unification algorithm in details above.
+However, there are some extra cares to take when trying to integrate it with an elaborator
+for a dependently typed language.
+
+First, what should the unification operates on, in a NBE setting: core terms or values?
+Here, the unification algorithm itself operates on values,
+for easy semantic operations and normalization.
+However, some operations, such as applying a partial substitution,
+will convert values back to core terms.
+In this case, the resulting core terms may need to be evaluated back to values again.
+See `Unify.ml` for more details.
+
+Second, local `let` definitions have many non-trivial interactions with unification.
+Assume we are in a context with local `let`: `Γ = x : A, y = t, z : B`.
+Assume that we are type checking a hole in `Γ`.
+We have created a fresh meta `?M`, which is a globally defined function.
+Now we need to apply `ᴦ` to `?M` to obtain a well-typed term in `Γ`.
+But the defined local variable `y` should *not* be applied to `?M`.
+So we should apply only `x` and `z` to `?M`.
 
 
 ## References

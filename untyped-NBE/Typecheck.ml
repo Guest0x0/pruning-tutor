@@ -56,6 +56,7 @@ let rec infer ctx expr =
         typ, exprC
 
     | Surface.Type ->
+        (* type-in-type, for simplicity *)
         Type, Core.Type
 
     | Surface.TyFun(name, a, b) ->

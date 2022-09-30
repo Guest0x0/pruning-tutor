@@ -1,5 +1,5 @@
 
-open Pruning
+open UntypedNBE
 
 let expr_of_string label src =
     let lexbuf = Lexing.from_string src in

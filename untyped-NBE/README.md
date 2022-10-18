@@ -91,6 +91,7 @@ Let `zs = xs ∩ ys`, then we can solve `?M1 xs = ?M2 ys` by
 In summary, the above four cases make up the following rules,
 of the form `e -> (E, σ)`, where `e` is a single equation, `E` is a list of equations
 and `σ` is a meta variable substitution:
+
     f ts = f us -> ({tᵢ = uᵢ}, ∅ )
         where f is a constructor, a constant or a free variable
 
@@ -179,52 +180,47 @@ This improvement is called *pruning*,
 as it will "prune away" dangerous variables from the arguments of a meta variable,
 so that the partial substitution will succeed.
 
-But how? Here, in contrast to `05-pruning` of [[1]](#ref1),
-where pruning operations are implemented on their own,
-I propose thinking in terms of *explicit substitution*,
-and derivate the pruning operations from the basic idea, reusing partial substitution operations.
+To perform a flex-flex case, we need to perform two steps:
 
-Ignore occurs check for a while, and assume we are computing `(?M ys)[xs⁻¹]`.
-Assume `Γₓ |- xs⁻¹ : Γ`, `?M : Γₘ -> A` and `Γ |- ys : Γₘ`.
+1. decide which variables should be discarded
+2. create a fresh meta that only depend on the "safe" variables,
+and solve the old meta with the new one
 
-1. First, we should ensure that `ys` is a list of distinct bound variables
-and hence satisfies the definition of higher order patterns.
-We can achieve this by computing the inverse of `ys`, `Γₘ |- ys⁻¹ : Γ`.
+In the actual code, these two steps are implemented using an intermediate data type called `pruning`.
+A `pruning` is just a list of `bool`, indicating "what to discard".
+For example, assume we have an equation `?M1 x y = ?M2 x z`,
+the arguments of `?M1` give rise to a partial substitution `ρ = [x := $1, y := $2]`,
+and we are applying to `?M2 x z`.
+Now, we need to prune away the variables in `x z` that don't fall in the domain of `ρ`.
+This give rise to a pruning `false true`,
+which indicate that the first argument (`x`) *should not* be pruned
+and the second argument (`z`) *should* be pruned.
 
-2. Recall that in the flex-flex case of the rewrite system, we need to compute `xs ∩ ys`.
-Now that we have `xs⁻¹` and `ys⁻¹`, we can simply take the intersection of their domain.
+Now that we have obtained a pruning `pr`, we may apply it to actually discard arguments.
+Continuing the example above, having `pr = false true`,
+we now allocate a fresh meta variable `?M'` which depend on `x` only,
+and solve `?M2` with `?M2 := \$1. \$2. ?M' $1`.
+Here the arguments to `?M'` in the solution can be obtained by
+applying the pruning to `pr` to `$1 $2`: the list of all variables `?M2` may depend.
 
-3. If `ys` is included in `xs`, then there is no need to prune `?M`,
-and we can leave `?M` as is and apply `xs⁻¹` on `ys` directly.
+Notice that we are performing the above during a partial substitution operation.
+So we need to calculate the substituted term too, which is `(?M' x)[ρ]`.
+Here the arguments of `?M'`, `x` can be obtained by applying the pruning `pr` to
+the arguments of `?M2`: `x y`.
+After that we applying `ρ` to `x`, and we are done!
 
-1. If `ys` is not included in `xs`, we must prune away some variables from `ys`.
-First, let's allocate a fresh meta variable `?M'`,
-we should set `\Γₘ . ?M' zs` for some `zs`, and the main difficulty lies in computing `zs`.
-This is particularly complex when we are using de Bruijn index/level.
+## Flex-flex with the same meta
+There's only one case left to handle: flex-flex case where both sides have the same meta.
+This case *cannot* be handled using the partial substitution operation,
+because equations like `?M x = f (?M x)` are unsolvable,
+and a flex-flex case with the same meta on both sides can only occur at top level.
 
-1. First, let's figure out what the type of `?M'` should be.
-`?M'` should have type `Γₘ' -> A[wk]`, where `Γₘ'` is `Γ` with variables not in `xs` pruned away,
-and `Γₘ |- wk : Γₘ'` is the weaking substitution.
+When we do encounter such a case at top level,
+we can calculate the desired list of "safe" variables `{ xᵢ | xᵢ = yᵢ }`
+by iterating through the list of arguments on both sides, obtaining a pruning `pr`.
+The rest of work is identical to flex-flex with different metas:
+just allocate a fresh meta and apply `pr` to obtain the solution to the old meta.
 
-1. Under `Γₘ'`, `zs` is simply all the variables/indicies/levels is `Γₘ'` and is easy to compute.
-Let this list of variables be `zs'`
-
-1. Now, to obtain `zs` in `?M := \Γₘ. ?M' zs`, we should lift `zs'` to `Γₘ`.
-This can be achieved by applying `wk` to `zs'`, reusing the partial substitution operation.
-
-1. Now that we have obtained `zs` and solved `?M`, we should consider what the result of
-`(?M ys)[xs⁻¹]` should be.
-Since we have already solved `?M` with `v = \Γₘ. ?M' zs`,
-we can reuse the evaluation mechanism and partial substitution operation,
-applying `xs⁻¹` to `v ys` directly.
-Since "bad" variables in `ys` are already pruned away by `v`,
-we know that there's no need for pruning in `(v ys)[xs⁻¹]`,
-and its computation must fall in the case of step (3.) above,
-hence this recursive computation won't loop forever.
-
-For the detailed index/level arithmetic,
-and how to compute the weakening substitution, etc.,
-refer to `Unify.ml`.
 
 
 ## Integration with elaboration

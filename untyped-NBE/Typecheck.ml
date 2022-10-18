@@ -92,7 +92,7 @@ let rec infer ctx expr =
     | Surface.Hole ->
         let typ_meta  = MetaContext.fresh_meta () in
         let hole_meta = MetaContext.fresh_meta () in
-        let args = Unify.env_to_args ctx.tenv in
+        let args = Unify.boundvars_to_args ctx.level ctx.tenv in
         Stuck(Meta typ_meta, args), quote ctx.level @@ Stuck(Meta hole_meta, args)
 
 
@@ -124,7 +124,7 @@ and check ctx typ expr =
         Core.Fun(name, bodyC)
     | _, Surface.Hole ->
         let hole_meta = MetaContext.fresh_meta () in
-        quote ctx.level @@ Stuck(Meta hole_meta, Unify.env_to_args ctx.tenv)
+        quote ctx.level @@ Stuck(Meta hole_meta, Unify.boundvars_to_args ctx.level ctx.tenv)
     | _ ->
         let typ', core = infer ctx expr in
         Unify.unify ctx.level typ typ';

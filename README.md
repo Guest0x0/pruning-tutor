@@ -10,8 +10,8 @@ This is a tutorial implementation of elaborators for a simple dependently langua
 
 There are two parts in this tutorial:
 
-- `untyped-NBE` is the most basic setting. It uses an untyped NBE algorithm.
-- (WIP) `typed-NBE` uses a *typed* NBE algorithm. It turns out that this has non-trivial interaction with unification.
+- `untyped-meta` is the most basic setting. It uses untyped NBE, conversion and meta.
+- (WIP) `typed-meta` features typed* conversion and meta. It turns out that this has non-trivial interaction with unification.
 
 Each part assumes basic understanding of the contents in the previous parts.
 So it is recommended to read these parts in order.

@@ -186,28 +186,28 @@ To perform a flex-flex case, we need to perform two steps:
 2. create a fresh meta that only depend on the "safe" variables,
 and solve the old meta with the new one
 
-In the actual code, these two steps are implemented using an intermediate data type called `pruning`.
-A `pruning` is just a list of `bool`, indicating "what to discard".
+In the actual code,
+these two steps are implemented using an intermediate data type called `pruning`.
+A `pruning` is a series of instructions indicating which arguments should be discarded.
 For example, assume we have an equation `?M1 x y = ?M2 x z`,
 the arguments of `?M1` give rise to a partial substitution `ρ = [x := $1, y := $2]`,
 and we are applying to `?M2 x z`.
 Now, we need to prune away the variables in `x z` that don't fall in the domain of `ρ`.
-This give rise to a pruning `false true`,
-which indicate that the first argument (`x`) *should not* be pruned
-and the second argument (`z`) *should* be pruned.
+This give rise to a pruning `keep; skip`,
+which indicate that the first argument (`x`) should be kept,
+while the second argument (`z`) should be pruned.
 
 Now that we have obtained a pruning `pr`, we may apply it to actually discard arguments.
-Continuing the example above, having `pr = false true`,
+Continuing the example above, having `pr = keep; skip`,
 we now allocate a fresh meta variable `?M'` which depend on `x` only,
 and solve `?M2` with `?M2 := \$1. \$2. ?M' $1`.
-Here the arguments to `?M'` in the solution can be obtained by
-applying the pruning to `pr` to `$1 $2`: the list of all variables `?M2` may depend.
+Here the arguments to `?M'` (`$1`) in the solution can be obtained by
+applying the pruning to `pr` to `$1 $2`.
 
 Notice that we are performing the above during a partial substitution operation.
 So we need to calculate the substituted term too, which is `(?M' x)[ρ]`.
-Here the arguments of `?M'`, `x` can be obtained by applying the pruning `pr` to
-the arguments of `?M2`: `x y`.
-After that we applying `ρ` to `x`, and we are done!
+Here the arguments of `?M'`, `x` can be obtained by applying the pruning `pr` to `x y`.
+After that we apply `ρ` to the pruned arguments, and we are done!
 
 ## Flex-flex with the same meta
 There's only one case left to handle: flex-flex case where both sides have the same meta.

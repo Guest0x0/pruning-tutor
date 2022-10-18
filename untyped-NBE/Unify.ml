@@ -71,6 +71,9 @@ let rec invert_spine level sp =
 
 
 
+(* A [pruning] is a series of instruction indicating which arguments to discard.
+   Note that syntactically, pruning is in reverse order of argument lists.
+   See [prune_spine] below for their relationship. *)
 type pruning =
     | EmptyPr
     | Keep of pruning

@@ -11,7 +11,8 @@ This is a tutorial implementation of elaborators for a simple dependently langua
 There are two parts in this tutorial:
 
 - `untyped-meta` is the most basic setting. It uses untyped NBE, conversion and meta.
-- (WIP) `typed-meta` features typed* conversion and meta. It turns out that this has non-trivial interaction with unification.
+- `typed-meta` features *typed* conversion and meta. It turns out that this has non-trivial interaction with unification.
+- (WIP) `generalized-eta` implements a generalized inversion algorithm that covers η-contraction
 
 Each part assumes basic understanding of the contents in the previous parts.
 So it is recommended to read these parts in order.

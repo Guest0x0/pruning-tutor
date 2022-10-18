@@ -4,7 +4,7 @@ type level = int
 
 module Value = struct
     type value =
-        | Stuck of head * value list
+        | Stuck of head * spine
         | Type
         (* The strings are variable names, used for pretty printing only *)
         | TyFun of string * value * (value -> value)
@@ -15,7 +15,11 @@ module Value = struct
         | Lvl  of level
         | Meta of meta
 
-    let stuck_local lvl = Stuck(Lvl lvl, [])
+    and spine =
+        | EmptySp
+        | App of spine * value
+
+    let stuck_local lvl = Stuck(Lvl lvl, EmptySp)
 
 
     type meta_info =

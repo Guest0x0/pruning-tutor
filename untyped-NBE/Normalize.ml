@@ -5,11 +5,13 @@ open Syntax
 
 let apply vf va =
     match vf with
-    | Value.Fun(_, f)      -> f va
-    | Value.Stuck(h, args) -> Value.Stuck(h, va :: args)
-    | _                    -> failwith "runtime error: not a function"
+    | Value.Fun(_, f)    -> f va
+    | Value.Stuck(h, sp) -> Value.Stuck(h, Value.App(sp, va))
+    | _                  -> failwith "runtime error: not a function"
 
-let apply_spine vf args = List.fold_right (Fun.flip apply) args vf
+let rec apply_spine vf = function
+    | Value.EmptySp        -> vf
+    | Value.App(sp', argv) -> apply (apply_spine vf sp') argv
 
 
 let rec force value =
@@ -31,7 +33,7 @@ let rec eval env = function
     | Core.App(vf, va)       -> apply (eval env vf) (eval env va)
     | Core.Meta meta         ->
         match MetaContext.find_meta meta with
-        | Value.Free          -> Value.(Stuck(Meta meta, []))
+        | Value.Free          -> Value.(Stuck(Meta meta, EmptySp))
         | Value.Solved v      -> v
         | exception Not_found -> failwith("unbound meta ?" ^ string_of_int meta)
 
@@ -39,8 +41,8 @@ let rec eval env = function
 
 let rec quote level value =
     match force value with
-    | Value.Stuck(head, args) ->
-        List.fold_right (fun a f -> Core.App(f, quote level a)) args (quote_head level head)
+    | Value.Stuck(head, sp) ->
+        quote_spine level (quote_head level head) sp
     | Value.Type ->
         Core.Type
     | Value.TyFun(name, a, b) ->
@@ -51,3 +53,7 @@ let rec quote level value =
 and quote_head level = function
     | Value.Lvl lvl   -> Core.Idx(level - lvl - 1)
     | Value.Meta meta -> Core.Meta meta
+
+and quote_spine level headC = function
+    | Value.EmptySp        -> headC
+    | Value.App(sp', argv) -> Core.App(quote_spine level headC sp', quote level argv)

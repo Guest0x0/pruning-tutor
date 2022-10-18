@@ -11,7 +11,9 @@ let rec make_fun n body =
     then body
     else make_fun (n - 1) (Core.Fun("", body))
 
-let level_to_args level = List.init level (fun idx -> stuck_local (level - idx - 1))
+let rec level_to_spine = function
+    | 0 -> EmptySp
+    | n -> App(level_to_spine (n - 1), stuck_local (n - 1))
 
 
 (* A [psubst] is a partial substitution, such that all values in it are bound variables.
@@ -47,20 +49,20 @@ let add_boundvar psub =
 
 
 (* Calculate the inverse substitution of a list of arguments.
-   The list of arguments [args] should live in a context with length [level].
+   The list of arguments [sp] should live in a context with length [level].
    That is, assume:
-       Γ(level) |- args : Δ
+       Γ(level) |- sp : Δ
    we should have:
-       Δ |- invert_args level args : Γ *)
-let rec invert_args level args =
-    match args with
-    | [] ->
+       Δ |- invert_spine level sp : Γ *)
+let rec invert_spine level sp =
+    match sp with
+    | EmptySp ->
         { empty_psubst with dom = level }
-    | Stuck(Lvl lvl, []) :: args' ->
+    | App(sp', Stuck(Lvl lvl, EmptySp)) ->
         (* We are now processing the [psub.cod]-th argument,
            it should correspond to the [level]-th bound variable
            in the codomain of the inverse substitution *)
-        let psub = invert_args level args' in
+        let psub = invert_spine level sp' in
         if List.mem_assoc lvl psub.map
         then failwith "the same variable occurs twice in arguments of meta"
         else { psub with cod = psub.cod + 1; map = (lvl, psub.cod) :: psub.map }
@@ -69,45 +71,52 @@ let rec invert_args level args =
 
 
 
+type pruning =
+    | EmptyPr
+    | Keep of pruning
+    | Skip of pruning
 
-(* Every [true] in a pruning [pr : pruning]
-   indicates that the item at the same position in an argument list should be discarded. *)
-type pruning = bool list
+let rec pruning_length = function
+    | EmptyPr  -> (0, 0)
+    | Keep pr' -> let (tot, rem) = pruning_length pr' in (tot + 1, rem + 1)
+    | Skip pr' -> let (tot, rem) = pruning_length pr' in (tot + 1, rem)
 
-(* [prune_args pr args] drop the arguments that should be pruned in [args],
+
+(* [prune_spine pr sp] drop the arguments that should be pruned in [sp],
    according to [pr]. *)
-let rec prune_args pr args =
-    match pr, args with
-    | [], [] ->
-        []
-    | should_prune :: pr', arg :: args' ->
-        let args' = prune_args pr' args' in
-        if should_prune
-        then args'
-        else arg :: args'
-    | _ ->
-        failwith "runtime error"
+let rec prune_spine pr sp =
+    match pr, sp with
+    | EmptyPr , EmptySp     -> EmptySp
+    | Keep pr', App(sp', v) -> App(prune_spine pr' sp', v)
+    | Skip pr', App(sp', _) -> prune_spine pr' sp'
+    | _                     -> failwith "runtime error"
 
 
-(* Let [args] be a list of bound variables,
-   [args_to_pruning pr args] calculates a pruning that prune away those variables in [args]
+(* Let [sp] be a list of bound variables,
+   [spine_to_pruning pr sp] calculates a pruning that prune away those variables in [sp]
    that do not fall in the domain of [psub]. *)
-let args_to_pruning psub args =
-    args |> List.map @@ fun argv ->
-    match force argv with
-    | Stuck(Lvl lvl, []) -> not (List.mem_assoc lvl psub.map)
-    | _                  -> failwith "arguments of meta not a bound variable"
+let rec spine_to_pruning psub = function
+    | EmptySp ->
+        EmptyPr
+    | App(sp', Stuck(Lvl lvl, EmptySp)) -> 
+        if List.mem_assoc lvl psub.map
+        then Keep (spine_to_pruning psub sp')
+        else Skip (spine_to_pruning psub sp')
+    | _ ->
+        failwith "arguments of meta not a bound variable"
 
 
-(* [intersect_args args1 args2] calculates a pruning that prune away those arguments
-   that differ in [args1] and [args2]. *)
-let rec intersect_args args1 args2 =
-    match args1, args2 with
-    | [], [] ->
-        []
-    | Stuck(Lvl lvl1, []) :: args1'
-    , Stuck(Lvl lvl2, []) :: args2' ->
-        (lvl1 <> lvl2) :: intersect_args args1' args2'
+(* [intersect_spine sp1 sp2] calculates a pruning that prune away those arguments
+   that differ in [sp1] and [sp2]. *)
+let rec intersect_spine sp1 sp2 =
+    match sp1, sp2 with
+    | EmptySp, EmptySp ->
+        EmptyPr
+    | App(sp1', Stuck(Lvl lvl1, EmptySp))
+    , App(sp2', Stuck(Lvl lvl2, EmptySp)) ->
+        if lvl1 = lvl2
+        then Keep (intersect_spine sp1' sp2')
+        else Skip (intersect_spine sp1' sp2')
     | _ ->
         failwith "runtime error"
 
@@ -115,20 +124,20 @@ let rec intersect_args args1 args2 =
 (* [discard_defined env] discards the defined variables in [env]. *)
 let rec discard_defined env : pruning =
     match env with
-    | Empty                  -> []
-    | Bound(env', _, _)      -> false :: discard_defined env'
-    | Defined(env', _, _, _) -> true  :: discard_defined env'
+    | Empty                  -> EmptyPr
+    | Bound(env', _, _)      -> Keep (discard_defined env')
+    | Defined(env', _, _, _) -> Skip (discard_defined env')
 
 
-(* [boundvars_to_args level env] returns the list of all bound variables in [env]
+(* [boundvars_to_spine level env] returns the list of all bound variables in [env]
    (of length [level]). *)
-let boundvars_to_args level env =
-    prune_args (discard_defined env) (level_to_args level)
+let boundvars_to_spine level env =
+    prune_spine (discard_defined env) (level_to_spine level)
 
 
 
 
-(* [apply_psubst m psub v] apply the partial renaming [psub] to value [v],
+(* [apply_psubst m psub v] apply the partial substitution [psub] to value [v],
    checking for occurence of [m] at the same time.
    [v] should live in [psub.dom], and the result should live in [psub.cod], i.e.:
 
@@ -143,37 +152,37 @@ let boundvars_to_args level env =
    When no occurs check need to be performed, [m] can be set to [-1]. *)
 let rec apply_psubst m psub value =
     match force value with
-    | Stuck(Lvl lvl, args) -> 
+    | Stuck(Lvl lvl, sp) -> 
         begin match List.assoc lvl psub.map with
         | lvl' ->
-            List.fold_right (fun a f -> Core.App(f, apply_psubst m psub a))
-                args (quote psub.cod @@ stuck_local lvl')
-        | exception Not_found -> failwith "variable may escape its scope"
+            apply_psubst_spine m psub (Core.Idx(psub.cod - lvl' - 1)) sp
+        | exception Not_found ->
+            failwith "variable may escape its scope"
         end
 
     (* Failed occurs check *)
     | Stuck(Meta m', _) when m' = m ->
         failwith("meta ?" ^ string_of_int m ^ " occurs recursively in its solution")
 
-   (* Renaming a meta differnt from [m].
-      This is the so-called "pruning" operation
-      and corresponds to the flex-flex case of the rewrite rules. *)
-    | Stuck(Meta m', args) ->
-        let level = List.length args in
-        let pr = args_to_pruning psub args in
-        if List.for_all not pr
-        then List.fold_right (fun a f -> Core.App(f, apply_psubst m psub a)) args (Core.Meta m')
+    (* Substituting a meta differnt from [m].
+       This is the so-called "pruning" operation
+       and corresponds to the flex-flex case of the rewrite rules. *)
+    | Stuck(Meta m', sp) ->
+        let pr = spine_to_pruning psub sp in
+        let (sp_len, pruned_len) = pruning_length pr in
+        if sp_len = pruned_len
+        then apply_psubst_spine m psub (Core.Meta m') sp
         else
             let new_meta = MetaContext.fresh_meta () in
             let solution =
-                let args = level_to_args level in
-                Stuck(Meta new_meta, prune_args pr args)
-                |> Normalize.quote level
+                Stuck(Meta new_meta, prune_spine pr @@ level_to_spine sp_len)
+                |> Normalize.quote sp_len
+                |> make_fun sp_len
                 |> Normalize.eval []
             in
             let _ = MetaContext.solve_meta m' solution in
-            List.fold_right (fun a f -> Core.App(f, apply_psubst m psub a))
-                (prune_args pr args) (Core.Meta new_meta)
+            apply_psubst_spine m psub (Core.Meta new_meta) (prune_spine pr sp)
+
     | Type ->
         Core.Type
     | TyFun(name, a, b) ->
@@ -181,6 +190,10 @@ let rec apply_psubst m psub value =
     | Fun(name, f) ->
         Core.Fun(name, apply_psubst m (add_boundvar psub) @@ f @@ stuck_local psub.dom)
 
+
+and apply_psubst_spine m psub headC = function
+    | EmptySp        -> headC
+    | App(sp', argv) -> Core.App(apply_psubst_spine m psub headC sp', apply_psubst m psub argv)
 
 
 let rec unify level v1 v2 =
@@ -201,23 +214,23 @@ let rec unify level v1 v2 =
         unify (level + 1) (apply v1 var) (apply v2 var)
 
     (* flex-flex case with same meta *)
-    | Stuck(Meta m1, args1), Stuck(Meta m2, args2) when m1 = m2 ->
-        let pr = intersect_args args1 args2 in
-        if List.exists Fun.id pr then
-            let level = List.length args1 in
+    | Stuck(Meta m1, sp1), Stuck(Meta m2, sp2) when m1 = m2 ->
+        let pr = intersect_spine sp1 sp2 in
+        let (sp_len, rem_len) = pruning_length pr in
+        if sp_len = rem_len then
             let new_meta = MetaContext.fresh_meta () in
             let solution =
-                let args = level_to_args level in
-                Stuck(Meta new_meta, prune_args pr args)
+                Stuck(Meta new_meta, prune_spine pr @@ level_to_spine sp_len)
                 |> Normalize.quote level
+                |> make_fun sp_len
                 |> Normalize.eval []
             in
             MetaContext.solve_meta m1 solution
 
     (* flex-rigid or flex-flex with different metas *)
-    | Stuck(Meta m, args), v
-    | v, Stuck(Meta m, args) ->
-        let psub = invert_args level args in
+    | Stuck(Meta m, sp), v
+    | v, Stuck(Meta m, sp) ->
+        let psub = invert_spine level sp in
         let solution =
             apply_psubst m psub v
             |> make_fun psub.cod
@@ -225,10 +238,15 @@ let rec unify level v1 v2 =
         in
         MetaContext.solve_meta m solution
 
-    | Stuck(Lvl lvl1, args1), Stuck(Lvl lvl2, args2) when lvl1 = lvl2 ->
-        begin try List.iter2 (unify level) args1 args2 with
-          Invalid_argument _ -> failwith "unsolvable equation"
-        end
+    | Stuck(Lvl lvl1, sp1), Stuck(Lvl lvl2, sp2) when lvl1 = lvl2 ->
+        unify_spine level sp1 sp2
 
     | _ ->
         failwith "unsolvable equation"
+
+
+and unify_spine level sp1 sp2 =
+    match sp1, sp2 with
+    | EmptySp, EmptySp             -> ()
+    | App(sp1', v1), App(sp2', v2) -> unify level v1 v2; unify_spine level sp1' sp2'
+    | _                            -> failwith "unsolvable equation"

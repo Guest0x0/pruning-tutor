@@ -1,0 +1,12 @@
+(library
+ (name generalizedEta)
+ (modules Syntax MetaContext Normalize Unify Typecheck Pretty Parser Lexer))
+
+(ocamlyacc Parser)
+(ocamllex Lexer)
+
+
+(test
+ (name generalizedEtaTest)
+ (libraries generalizedEta)
+ (modules generalizedEtaTest))

@@ -8,7 +8,7 @@
 - `Unify.ml`: the main pattern unification algorithm with pruning
 - `Typecheck.ml`: a simple bidirectional type checker
 - `Pretty.ml`, `Parser.mly` and `Lexer.mll`: boring utilities
-- `PruningTest.ml`: tests for the implementation. You can find some example programs here
+- `untypedMetaTest.ml`: tests for the implementation. You can find some example programs here
 
 If you already have some experience with dependent type checking and NBE,
 all files except `Unify.ml` are standard.

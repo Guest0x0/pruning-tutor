@@ -58,7 +58,7 @@ The source code structure is identical to `untyped-meta`:
 - `Unify.ml`: the main pattern unification algorithm with pruning
 - `Typecheck.ml`: a simple bidirectional type checker
 - `Pretty.ml`, `Parser.mly` and `Lexer.mll`: boring utilities
-- `typedNBETest.ml`: tests for the implementation. You can find some example programs here
+- `typedMetaTest.ml`: tests for the implementation. You can find some example programs here
 
 Meta variables are now typed,
 which requires some slight modification in `Syntax.ml`, `MetaContext.ml` and `Normalize.ml`.

@@ -60,7 +60,7 @@ let rec invert_spine level sp =
         { empty_psubst with dom = level }
     | App(sp', Stuck(Lvl lvl, EmptySp)) ->
         (* We are now processing the [psub.cod]-th argument,
-           it should correspond to the [level]-th bound variable
+           it should correspond to the [psub.cod]-th bound variable
            in the codomain of the inverse substitution *)
         let psub = invert_spine level sp' in
         if List.mem_assoc lvl psub.map

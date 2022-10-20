@@ -114,7 +114,7 @@ and check ctx typ expr =
     match force typ, expr with
     | typ, Surface.Let(name, rhs, body) ->
         let rhs_typ, rhsC = infer ctx rhs in
-        let bodyC = check (add_defined name rhs_typ (eval [] rhsC) ctx) typ body in
+        let bodyC = check (add_defined name rhs_typ (eval ctx.venv rhsC) ctx) typ body in
         Core.Let(name, rhsC, bodyC)
 
     | TyFun(_, a, b), Surface.Fun(name, ann, body) ->
@@ -122,7 +122,7 @@ and check ctx typ expr =
             match ann with
             | Some ann ->
                 let annC = check_typ ctx ann in
-                let annV = eval [] annC in
+                let annV = eval ctx.venv annC in
                 Unify.unify ctx.level annV a;
                 annV
             | None ->

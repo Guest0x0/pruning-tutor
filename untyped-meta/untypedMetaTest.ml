@@ -67,9 +67,9 @@ fun (A : Type) ->
         unify M A
 " ;;
 
-register_test "unify.context.2" (Some "unsolvable equation") "
+register_test "unify.context.2" (Some "variable may escape its scope") "
 fun (A : Type) ->
-    let M = _ : Type in
+    let M = _ : A in
     fun (a : A) ->
         unify M a
 " ;;

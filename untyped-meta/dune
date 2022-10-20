@@ -1,5 +1,5 @@
 (library
- (name untypedNBE)
+ (name untypedMeta)
  (modules Syntax MetaContext Normalize Unify Typecheck Pretty Parser Lexer))
 
 (ocamlyacc Parser)
@@ -7,6 +7,6 @@
 
 
 (test
- (name untypedNBETest)
- (libraries untypedNBE)
- (modules untypedNBETest))
+ (name untypedMetaTest)
+ (libraries untypedMeta)
+ (modules untypedMetaTest))

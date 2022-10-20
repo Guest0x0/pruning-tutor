@@ -95,6 +95,13 @@ let rec infer ctx expr =
         let sp = Unify.boundvars_to_spine ctx.level ctx.tenv in
         Stuck(Meta typ_meta, sp), quote ctx.level @@ Stuck(Meta hole_meta, sp)
 
+    | Surface.Unify(lhs, rhs) ->
+        let lhs_typ, lhsC = infer ctx lhs in
+        let rhs_typ, rhsC = infer ctx rhs in
+        Unify.unify ctx.level lhs_typ rhs_typ;
+        Unify.unify ctx.level (eval ctx.venv lhsC) (eval ctx.venv rhsC);
+        lhs_typ, lhsC
+
 
 and check_typ ctx expr =
     let typ, core = infer ctx expr in
@@ -109,6 +116,7 @@ and check ctx typ expr =
         let rhs_typ, rhsC = infer ctx rhs in
         let bodyC = check (add_defined name rhs_typ (eval [] rhsC) ctx) typ body in
         Core.Let(name, rhsC, bodyC)
+
     | TyFun(_, a, b), Surface.Fun(name, ann, body) ->
         let arg_typ =
             match ann with
@@ -122,9 +130,17 @@ and check ctx typ expr =
         in
         let bodyC = check (add_bound name arg_typ ctx) (b @@ stuck_local ctx.level) body in
         Core.Fun(name, bodyC)
+
     | _, Surface.Hole ->
         let hole_meta = MetaContext.fresh_meta () in
         quote ctx.level @@ Stuck(Meta hole_meta, Unify.boundvars_to_spine ctx.level ctx.tenv)
+
+    | typ, Surface.Unify(lhs, rhs) ->
+        let lhsC = check ctx typ lhs in
+        let rhsC = check ctx typ rhs in
+        Unify.unify ctx.level (eval ctx.venv lhsC) (eval ctx.venv rhsC);
+        lhsC
+
     | _ ->
         let typ', core = infer ctx expr in
         Unify.unify ctx.level typ typ';

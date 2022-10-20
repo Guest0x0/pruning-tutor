@@ -14,6 +14,7 @@ open Surface
 %token<int   > TOK_INT
 %token TOK_KW_TYPE TOK_KW_FORALL
 %token TOK_KW_FUN TOK_KW_LET TOK_KW_IN
+%token TOK_KW_UNIFY
 
 
 
@@ -53,6 +54,9 @@ expr :
 binop_expr:
     | app_expr
         { $1 }
+
+    | TOK_KW_UNIFY atom_expr atom_expr
+        { Unify($2, $3) }
 
     | binop_expr TOK_COLON binop_expr
         { Ann($1, $3) }

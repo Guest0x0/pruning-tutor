@@ -1,5 +1,5 @@
 
-open UntypedNBE
+open TypedMeta
 
 let expr_of_string label src =
     let lexbuf = Lexing.from_string src in
@@ -50,48 +50,57 @@ register_test "basic" None "
 fun (A : Type) (B : A -> Type) (f : forall (a : A) -> B a) (a : A) -> f a
 " ;;
 
-register_test "unify.basic.infer" None "
+register_test "hole.infer" None "
 fun (A : Type) (f : A -> A) (a : _) -> f a
 " ;;
 
-register_test "unify.basic.check" None "
+register_test "hole.check" None "
 fun (A : Type) (B : A -> Type) (f : forall (a : A) -> B a) (a0 : A) ->
     (f _ : B a0)
 " ;;
 
 
 register_test "unify.context.1" None "
-fun (id : forall (A : Type) -> A -> A) (A : Type) ->
-    let T = _ : Type in
-    fun (a : A) -> id T a
+fun (A : Type) ->
+    let M = _ : Type in
+    fun (a : A) ->
+        unify M A
 " ;;
 
-register_test "unify.context.2" None "
-fun (A : Type) (B : A -> Type) (a0 : A) ->
-    let T = _ : Type in
-    fun (id : forall (A : Type) -> A -> A) (b : B a0) ->
-        id T b
+register_test "unify.context.2" (Some "unsolvable equation") "
+fun (A : Type) ->
+    let M = _ : Type in
+    fun (a : A) ->
+        unify M a
 " ;;
 
 
 register_test "unify.app.1" None "
 let f = _ : (Type -> Type) in
-fun (id : forall (A : Type) -> A -> A) (A : Type) (a : A) ->
-    id (f A) a
+fun (A : Type) ->
+    unify (f A) A
 " ;;
 
 register_test "unify.app.2" None "
 fun (A : Type) ->
     let f = _ : (A -> (A -> Type) -> Type) in
-    fun (id : forall (A : Type) -> A -> A) (B : A -> Type) (a0 : A) (b : B a0) ->
-    id (f a0 B) b
+    fun (B : A -> Type) (a0 : A) ->
+        unify (f a0 B) (B a0)
 " ;;
 
 
 register_test "unify.let.1" None "
-fun (id : forall (A : Type) -> A -> A) (A : Type) ->
+fun (A : Type) ->
     let T = A in
-    fun (a : A) -> id _ a
+    let M = _ : Type in
+    unify M T
+" ;;
+
+register_test "unify.let.2" None "
+fun (A : Type) ->
+    let M = _ : Type in
+    let T = A in
+    unify M T
 " ;;
 
 

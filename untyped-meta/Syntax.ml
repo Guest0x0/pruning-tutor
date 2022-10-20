@@ -58,4 +58,5 @@ module Surface = struct
         | Fun   of string * expr option * expr
         | App   of expr * expr
         | Hole
+        | Unify of expr * expr
 end

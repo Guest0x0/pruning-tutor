@@ -147,12 +147,17 @@ let rec prune_tyfun pr typ =
    The list of arguments [sp] should live in a context with length [level].
    The range/destination of the inverse substitution starts from [base].
    That is, assume:
-       Γ₀(base),Γ(level - base) |- id(Γ),sp : Γ₀,Δ
+
+       Γ₀(base),Γ(level - base) |- id(Γ₀),sp : Γ₀,Δ
+
    we should have:
-       Γ₀,Δ |- invert_spine (lb, ub) level sp : Γ₀,Γ
-   where all variables in Γ₀ are undefined in [invert_spine (lb, ub) level sp],
-   and only variables in Γ (i.e. those [l] such that [base <= l < level])
-   can occur at head position in [sp]. *)
+
+       Γ₀,Δ |- invert_spine ~base level sp : Γ₀,Γ
+
+   with the following properties:
+   1. all variables in Γ₀ are undefined in the domain of [invert_spine ~base level sp]
+   2. only variables in Γ (i.e. those [l] such that [base <= l < level]) can occur in [sp]
+   3. only variables in Δ can occur in [invert_spine ~base level sp] *)
 and invert_spine ?(base=0) level sp =
     match sp with
     | EmptySp ->
@@ -169,17 +174,25 @@ and invert_spine ?(base=0) level sp =
 (* [invert_value base level0 value dst psub] inverts the equation [dst := value]
    and adds the result to an existing partial substitution [psub].
    We should have:
+
        Γ₀(base),Γ(level0 - base) |- value : A
+
    and:
+
        psub.cod |- psub : Γ₀,Γ
        psub.cod |- dst : A[psub]
+
    Now the result is:
+
         psub.cod, A[psub] |- invert_value base level0 value dst psub : Γ₀,Γ,A
+
    where only variables in Γ (i.e. those [l] such that [base <= l < level0])
-   can occur at head position in [value]. *)
+   can occur in [value]. *)
 and invert_value base level0 value dst psub =
-    (* [loop level dst_sp value] inverts a equation
-           Γ₀,Γ,Δ(level - level0) |- dst dst_sp := value *)
+    (* [loop level dst_sp value] inverts a equation:
+           Γ₀,Γ,Δ(level - level0) |- dst (dst_sp[psub,id(Δ[psub])) := value
+       where:
+           Γ₀,Γ,Δ(level - level0) |- id(Γ₀,Γ),dst_sp : Γ₀,Γ,Δ *)
     let rec loop level dst_sp value =
         match force value with
         | Fun(_, f) ->
@@ -201,13 +214,39 @@ and invert_value base level0 value dst psub =
 
             begin try
                 (* We have:
-                       Γ₀,Γ,Δ |- id(psub.cod),sp : psub.cod,Δ[psub]
+                       Γ₀,Γ,Δ |- id(Γ₀,Γ),sp : Γ₀,Γ,Δ'
                    By definition of [invert_spine]:
-                       psub.cod,Δ[psub] |- sp_inv : Γ₀,Γ,Δ
-                   where all variables in Γ₀,Γ are undefined in [sp_inv],
-                   and only variables in Δ can occur at head position in [sp]. *)
+                       Γ₀,Γ,Δ' |- sp_inv : Γ₀,Γ,Δ *)
                 let sp_inv = invert_spine ~base:level0 level sp in
-                (* psub.cod |- solution = \Δ. dst (dst_sp[sp_inv]) : A[psub] *)
+                (* The correctness of [solution] is a bit tricky here.
+                   We should have:
+
+                       psub.cod |- solution : A[psub]
+
+                   But dst_sp[sp_inv] does not live in [psub.cod]:
+
+                       Γ₀,Γ,Δ' |- id(Γ₀,Γ),dst_sp[sp_inv] : Γ₀,Γ,Δ
+
+                   We should further apply to it [psub,id(Δ'[psub])]:
+
+                       psub.cod,Δ'[psub] |- id(psub.cod),dst_sp[sp_inv][psub] : psub.cod,Δ[psub]
+
+                   So the correct solution is
+
+                       \Δ'[psub]. dst ( dst_sp [sp_inv] [psub,id(Δ'[psub])] )
+
+                   However, since [dst_sp[sp_inv]] is in [Core.expr] (de Bruijn index),
+                   and only variables in Δ' can occur in [dst_sp[sp_inv]]
+                   (by property 3 of [invert_spine]),
+                   we have the following nice property:
+
+                       dst_sp[sp_inv] = dst_sp[sp_inv][psub,id(Δ'[psub])]
+                           (in de Bruijn representation)
+
+                   Because only the id(Δ'[psub]) part of the substitution will take effect.
+                   So we can safely skip the [psub,id(Δ'[psub])] step.
+                   Notice that if we are using a typed value representation,
+                   then the extra substitution is necessary to obtain the correct type. *)
                 let solution =
                     (* [dst] lives in [psub.cod],
                        and we have added (level - level0) extra bound variables (Δ),
